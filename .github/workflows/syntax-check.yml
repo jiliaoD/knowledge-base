@@ -1,0 +1,54 @@
+name: 语法检查
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  syntax:
+    name: Python 语法与配置检查
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 拉取代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # 只做字节码编译，不装 torch / flagembedding 这类重依赖，
+      # 所以这一步几秒钟就能跑完，专门用来拦住语法错误和漏改的缩进问题。
+      - name: 全量编译检查（python -m compileall）
+        run: python -m compileall -q config processor tool utils web test
+
+      - name: 校验 pyproject.toml 能被解析
+        run: |
+          python - <<'PY'
+          import pathlib, tomllib
+          data = tomllib.loads(pathlib.Path("pyproject.toml").read_text(encoding="utf-8"))
+          print("project.name =", data["project"]["name"])
+          print("requires-python =", data["project"]["requires-python"])
+          PY
+
+      # 兜底防线：.env 里放的是真实密钥，一旦被提交上来要在 CI 就拦下来
+      - name: 确认没有把 .env 提交进仓库
+        run: |
+          if git ls-files --error-unmatch .env >/dev/null 2>&1; then
+            echo "::error::检测到 .env 被纳入版本控制，请立刻移除并吊销其中泄露的密钥"
+            exit 1
+          fi
+          echo "未发现被跟踪的 .env，通过"
+
+      - name: 确认没有把大文件/中间产物提交进仓库
+        run: |
+          bad=$(git ls-files | grep -E '^(temp-files/|\.venv/|output_md/)' || true)
+          if [ -n "$bad" ]; then
+            echo "::error::检测到不该入库的路径："
+            echo "$bad"
+            exit 1
+          fi
+          echo "未发现导入中间产物，通过"
