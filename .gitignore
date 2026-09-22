@@ -1,0 +1,48 @@
+# ==================== 密钥 / 环境变量 ====================
+# 真实密钥只放本地，模板文件 .env.example 才提交
+.env
+.env.*
+!.env.example
+
+# ==================== Python ====================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# ==================== 虚拟环境 ====================
+.venv/
+venv/
+env/
+.python-version
+
+# ==================== 导入 / 解析中间产物 ====================
+# PDF 原件、MinerU 解压结果、图片、切片备份等都落在这里，很大且可重建
+temp-files/
+output_md/
+doc/
+*.log
+
+# ==================== 模型权重（本地下载，不入库） ====================
+models/
+*.safetensors
+*.ckpt
+*.onnx
+
+# ==================== IDE / 编辑器 ====================
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# ==================== 操作系统 ====================
+.DS_Store
+Thumbs.db
+desktop.ini

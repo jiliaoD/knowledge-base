@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>产品手册智能问答 · 知识库导入</title>
+<style>
+  :root{
+    --bg:#f5f7fb; --panel:#ffffff; --line:#e6eaf2; --text:#1f2937; --muted:#6b7280;
+    --brand:#2563eb; --brand-soft:#e8f0ff; --ok:#16a34a; --ok-soft:#e8f7ed;
+    --warn:#d97706; --warn-soft:#fff5e6; --err:#dc2626; --err-soft:#fdecec;
+    --shadow:0 6px 20px rgba(17,24,39,.08);
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--bg); color:var(--text);
+    font-family:"PingFang SC","Microsoft YaHei","Helvetica Neue",Arial,sans-serif;
+    padding:22px 18px 60px;
+  }
+  .wrap{max-width:900px; margin:0 auto}
+  header{display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:18px}
+  header h1{font-size:18px; margin:0; font-weight:600}
+  header .sub{color:var(--muted); font-size:12px}
+  .spacer{flex:1}
+  .pill{font-size:12px; padding:4px 10px; border-radius:999px; background:var(--brand-soft); color:var(--brand)}
+  .pill.bad{background:var(--err-soft); color:var(--err)}
+  a.link{font-size:13px; color:var(--brand); text-decoration:none}
+  a.link:hover{text-decoration:underline}
+  .card{background:var(--panel); border:1px solid var(--line); border-radius:14px; box-shadow:var(--shadow); padding:16px; margin-bottom:16px}
+  .card h2{font-size:14px; margin:0 0 12px; font-weight:600}
+  .drop{
+    border:2px dashed #cbd5e1; border-radius:12px; padding:26px 16px; text-align:center;
+    color:var(--muted); font-size:13px; cursor:pointer; transition:.15s; background:#fbfcfe;
+  }
+  .drop:hover, .drop.over{border-color:var(--brand); background:#f4f8ff; color:var(--brand)}
+  .drop b{color:var(--brand)}
+  .filelist{margin-top:14px}
+  .filerow{display:flex; align-items:center; gap:10px; padding:8px 10px; border:1px solid var(--line); border-radius:10px; margin-bottom:8px; font-size:13px}
+  .filerow .name{flex:1; word-break:break-all}
+  .filerow .size{color:var(--muted); font-size:12px}
+  button{font:inherit; cursor:pointer; border-radius:10px; border:1px solid var(--line); background:var(--panel); padding:7px 14px; font-size:13px}
+  button.primary{background:var(--brand); border-color:var(--brand); color:#fff}
+  button:disabled{opacity:.55; cursor:not-allowed}
+  button.mini{padding:3px 9px; font-size:12px}
+  .actions{display:flex; align-items:center; gap:12px; margin-top:14px; flex-wrap:wrap}
+  .summary{font-size:13px; color:var(--muted)}
+  .task{border:1px solid var(--line); border-radius:12px; padding:12px 14px; margin-bottom:10px; background:#fff}
+  .task .top{display:flex; align-items:center; gap:10px; flex-wrap:wrap}
+  .task .fname{flex:1; font-size:13px; word-break:break-all}
+  .badge{font-size:12px; padding:2px 9px; border-radius:999px; background:#eef2f7; color:#475569}
+  .badge.processing{background:var(--warn-soft); color:var(--warn)}
+  .badge.completed{background:var(--ok-soft); color:var(--ok)}
+  .badge.failed{background:var(--err-soft); color:var(--err)}
+  .chips{display:flex; flex-wrap:wrap; gap:6px; margin-top:10px}
+  .chip{font-size:12px; padding:2px 8px; border-radius:999px; background:#eef2f7; color:#475569}
+  .chip.run{background:var(--warn-soft); color:var(--warn)}
+  .chip.done{background:var(--ok-soft); color:var(--ok)}
+  .meta{font-size:11px; color:var(--muted); margin-top:8px}
+  .tip{font-size:12px; color:var(--muted); line-height:1.7}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>知识库导入</h1>
+    <span class="sub">上传 PDF / Markdown，自动完成解析 → 切分 → 识别 → 向量化 → 入库</span>
+    <span class="spacer"></span>
+    <span class="pill" id="apiPill">服务: 检测中…</span>
+    <a class="link" href="/chat.html">去问答页 →</a>
+  </header>
+
+  <div class="card">
+    <h2>1. 选择文件（可多选，支持批量）</h2>
+    <div class="drop" id="drop">
+      点击选择文件，或把文件拖到这里<br />
+      <b>支持 .pdf / .md</b>，可一次选多个一起导入
+    </div>
+    <input type="file" id="fileInput" multiple accept=".pdf,.md" style="display:none" />
+    <div class="filelist" id="fileList"></div>
+    <div class="actions">
+      <button class="primary" id="btnUpload" disabled>开始导入</button>
+      <button class="mini" id="btnClear">清空选择</button>
+      <span class="summary" id="pickSummary">尚未选择文件</span>
+    </div>
+    <div class="meta">说明：多个文件会逐个执行（共用同一块 GPU 与解析服务），因此是排队处理，不是同时跑。</div>
+  </div>
+
+  <div class="card">
+    <h2>2. 导入进度</h2>
+    <div class="summary" id="overall">暂无任务</div>
+    <div id="tasks" style="margin-top:12px"></div>
+    <div class="tip" id="tip">进度按节点实时更新；单个 PDF 通常需要几分钟（含 PDF 解析与图片理解）。</div>
+  </div>
+</div>
+
+<script>
+  // 同源服务，直接用当前站点地址
+  const API_BASE = location.protocol.startsWith('http') ? location.origin : 'http://127.0.0.1:8000';
+  // 问答页在另一个服务上（导入 8000 / 查询 8001），按端口推导；推导不出来就回落默认地址
+  const CHAT_URL = location.protocol.startsWith('http')
+    ? location.origin.replace(/:\d+$/, ':8001') + '/chat.html'
+    : 'http://127.0.0.1:8001/chat.html';
+
+  const dropEl = document.getElementById('drop');
+  const fileInput = document.getElementById('fileInput');
+  const fileListEl = document.getElementById('fileList');
+  const btnUpload = document.getElementById('btnUpload');
+  const btnClear = document.getElementById('btnClear');
+  const pickSummary = document.getElementById('pickSummary');
+  const overallEl = document.getElementById('overall');
+  const tasksEl = document.getElementById('tasks');
+  const apiPill = document.getElementById('apiPill');
+
+  let selected = [];          // 待上传的文件
+  let taskRows = [];          // { taskId, filename, el, status, timer }
+
+  /* ---------------- 选择文件 ---------------- */
+
+  function humanSize(n){
+    if (n < 1024) return n + ' B';
+    if (n < 1024*1024) return (n/1024).toFixed(1) + ' KB';
+    return (n/1024/1024).toFixed(2) + ' MB';
+  }
+
+  function renderSelected(){
+    fileListEl.innerHTML = '';
+    selected.forEach((f, i) => {
+      const row = document.createElement('div');
+      row.className = 'filerow';
+      row.innerHTML = '<span class="name">' + f.name + '</span>' +
+                      '<span class="size">' + humanSize(f.size) + '</span>';
+      const del = document.createElement('button');
+      del.className = 'mini';
+      del.textContent = '移除';
+      del.addEventListener('click', () => { selected.splice(i, 1); renderSelected(); });
+      row.appendChild(del);
+      fileListEl.appendChild(row);
+    });
+    pickSummary.textContent = selected.length ? ('已选择 ' + selected.length + ' 个文件') : '尚未选择文件';
+    btnUpload.disabled = selected.length === 0;
+    btnUpload.textContent = selected.length ? ('开始导入（' + selected.length + ' 个）') : '开始导入';
+  }
+
+  function addFiles(list){
+    const incoming = Array.from(list || []);
+    incoming.forEach(f => {
+      const ext = ('.' + f.name.split('.').pop()).toLowerCase();
+      if (ext !== '.pdf' && ext !== '.md') {
+        alert('只支持 .pdf / .md：' + f.name);
+        return;
+      }
+      // 简单去重：同名同大小不重复添加
+      if (!selected.some(s => s.name === f.name && s.size === f.size)) selected.push(f);
+    });
+    renderSelected();
+  }
+
+  dropEl.addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', (e) => { addFiles(e.target.files); fileInput.value = ''; });
+  ['dragenter','dragover'].forEach(ev => dropEl.addEventListener(ev, e => {
+    e.preventDefault(); dropEl.classList.add('over');
+  }));
+  ['dragleave','drop'].forEach(ev => dropEl.addEventListener(ev, e => {
+    e.preventDefault(); dropEl.classList.remove('over');
+  }));
+  dropEl.addEventListener('drop', (e) => addFiles(e.dataTransfer.files));
+  btnClear.addEventListener('click', () => { selected = []; renderSelected(); });
+
+  /* ---------------- 任务卡片与轮询 ---------------- */
+
+  function createTaskCard(filename, taskId){
+    const el = document.createElement('div');
+    el.className = 'task';
+    el.innerHTML =
+      '<div class="top">' +
+        '<span class="fname">' + filename + '</span>' +
+        '<span class="badge pending">排队中</span>' +
+      '</div>' +
+      '<div class="chips"></div>' +
+      '<div class="meta">task_id: ' + taskId + ' · 耗时 <span class="elapsed">0</span> 秒</div>';
+    tasksEl.prepend(el);
+    const row = { taskId, filename, el, status: 'pending', start: Date.now(), timer: null };
+    taskRows.push(row);
+    return row;
+  }
+
+  function updateCard(row){
+    const badge = row.el.querySelector('.badge');
+    const chips = row.el.querySelector('.chips');
+    const elapsed = row.el.querySelector('.elapsed');
+
+    const text = {pending:'排队中', processing:'处理中', completed:'已完成', failed:'失败（详见服务端日志）'}[row.status] || row.status;
+    badge.textContent = text;
+    badge.className = 'badge ' + (row.status || 'pending');
+
+    chips.innerHTML =
+      (row.running || []).map(n => '<span class="chip run">' + n + ' …</span>').join('') +
+      (row.done || []).map(n => '<span class="chip done">' + n + ' ✓</span>').join('');
+
+    elapsed.textContent = Math.round((Date.now() - row.start) / 1000);
+  }
+
+  function refreshOverall(){
+    if (!taskRows.length) { overallEl.textContent = '暂无任务'; return; }
+    const c = {pending:0, processing:0, completed:0, failed:0};
+    taskRows.forEach(r => c[r.status] = (c[r.status] || 0) + 1);
+    overallEl.textContent = '共 ' + taskRows.length + ' 个任务：已完成 ' + c.completed +
+                            ' / 处理中 ' + (c.processing + c.pending) + ' / 失败 ' + c.failed;
+  }
+
+  function startPolling(row){
+    const tick = async () => {
+      try{
+        const res = await fetch(API_BASE + '/status/' + row.taskId);
+        const d = await res.json();
+        row.status = d.status || row.status;
+        row.done = d.done_list || [];
+        row.running = d.running_list || [];
+        updateCard(row);
+        refreshOverall();
+        if (row.status === 'completed' || row.status === 'failed') {
+          clearInterval(row.timer);
+          if (taskRows.every(r => r.status === 'completed' || r.status === 'failed')) {
+            btnUpload.disabled = false;
+          }
+        }
+      }catch(e){ /* 轮询失败不中断，下一轮再试 */ }
+    };
+    row.timer = setInterval(tick, 1500);
+    tick();
+  }
+
+  /* ---------------- 批量上传 ---------------- */
+
+  async function startUpload(){
+    if (!selected.length) return;
+    const files = selected.slice();
+    btnUpload.disabled = true;
+    btnUpload.textContent = '上传中…';
+
+    const formData = new FormData();
+    files.forEach(f => formData.append('files', f));   // 一次请求提交全部文件（批量）
+
+    try{
+      const res = await fetch(API_BASE + '/upload', { method:'POST', body: formData });
+      if (!res.ok) throw new Error(await res.text() || ('HTTP ' + res.status));
+      const data = await res.json();
+
+      const rejected = data.rejected || [];
+      if (rejected.length) {
+        alert('以下文件被跳过：\n' + rejected.map(r => r.filename + '（' + r.reason + '）').join('\n'));
+      }
+
+      (data.files || []).forEach(item => {
+        const row = createTaskCard(item.filename, item.task_id);
+        updateCard(row);
+        startPolling(row);
+      });
+      refreshOverall();
+
+      // 上传成功：清空待选列表
+      selected = [];
+      renderSelected();
+      btnUpload.textContent = '开始导入';
+
+    }catch(e){
+      alert('上传失败：' + (e.message || e));
+      btnUpload.disabled = false;
+      btnUpload.textContent = '开始导入';
+    }
+  }
+
+  btnUpload.addEventListener('click', startUpload);
+
+  /* ---------------- 健康检查 ---------------- */
+  (async () => {
+    try{
+      const res = await fetch(API_BASE + '/health');
+      if (!res.ok) throw new Error('bad');
+      apiPill.textContent = '服务: 已连接';
+    }catch(e){
+      apiPill.textContent = '服务: 未连接';
+      apiPill.classList.add('bad');
+    }
+  })();
+
+  const chatLink = document.querySelector('a.link');
+  if (chatLink) chatLink.href = CHAT_URL;
+
+  renderSelected();
+</script>
+</body>
+</html>
