@@ -148,7 +148,7 @@ knowledge_base/
 ### 1. 拉代码并装依赖
 
 ```bash
-git clone <your-repo-url>
+git clone https://github.com/jiliaoD/knowledge-base.git
 cd knowledge_base
 uv sync
 ```
@@ -310,7 +310,7 @@ Milvus 的 `varchar` 上限按**字节**算（中文 3 字节/字）。本工程
 
 ## 已知限制
 
-- 没有单元测试与 CI，验证靠脚本 + 手工回归
+- CI 目前只做 Python 语法检查，暂无单元测试，验证靠脚本 + 手工回归
 - 接口无鉴权、CORS 全开、中间件使用默认账号，**只适合本地演示**
 - 任务进度与 SSE 队列都是进程内内存态，重启服务即丢（已入库数据不受影响）
 - 重排序与联网搜索依赖外部云服务，网络抖动会影响体验
